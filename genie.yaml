@@ -1,0 +1,29 @@
+presets:
+  verify: null
+  update: null
+  release: null
+  coffeescript:
+    targets:
+      node:
+        - preset: node
+          glob:
+            - '{src,test}/**/*.coffee'
+  yaml:
+    targets:
+      node:
+        - preset: js
+          glob:
+            - "{src,test}/**/*.yaml"
+  esm: null
+sky:
+  secrets:
+    - name: playtyme-test-reseller-token
+      type: environment
+    - name: playtyme-test-reseller-shared
+      type: environment
+    - name: playtyme-test-supplier-token
+      type: environment
+    - name: playtyme-test-supplier-shared
+      type: environment
+    - name: playtyme-api-key
+      type: random-16

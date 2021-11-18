@@ -1,0 +1,10 @@
+Test-Reseller:
+  key: a645a049e8b29f97df1bb79c90cc70ac
+  subdomain: playtyme-test-reseller
+  token: playtyme-test-reseller-token
+  shared: playtyme-test-reseller-shared
+Test-Supplier:
+  key: 8210c24cfb20d421b7c7bf1fafa19d5c
+  subdomain: playtyme-test-supplier
+  token: playtyme-test-supplier-token
+  shared: playtyme-test-supplier-shared
