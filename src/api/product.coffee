@@ -1,5 +1,6 @@
 import * as Obj from "@dashkite/joy/object"
 import * as Meta from "@dashkite/joy/metaclass"
+import * as Text from "@dashkite/joy/text"
 import { getStore } from "../stores"
 import * as Shopify from "../shopify"
 import { except, meta } from "./helpers"
@@ -15,14 +16,43 @@ class ProductVariant
     self = Object.assign new ProductVariant, { store, _: { id } }
     self.get()
 
+  @list: (store, id) ->
+    variants = Obj.get "variants",
+      await Shopify.get store, "/products/#{id}/variants.json?limit=250"
+    for variant in variants
+      Object.assign new ProductVariant,
+        store: store
+        _: variant
+
+  # TODO replace this nonsense with forward pointers
+
+  @getFromInventoryItem: (store, id) ->
+    variants = Obj.get "variants",
+      await Shopify.get store, "/variants.json"
+    for variant in variants when variant.inventory_item_id == id
+      return ProductVariant.from store, variant
+
+  @getFromSKU: (store, sku) ->
+    variants = Obj.get "variants",
+      await Shopify.get store, "/variants.json"
+    for variant in variants when variant.sku == sku
+      return ProductVariant.from store, variant
+
   Meta.mixin @::, [
     Meta.getters
-      inventory:->
+      id: -> @_.id
+      sku: -> @_.sku
+      inventory: ->
         # make sure we have the latest
         await @get()
         @_.inventory_quantity
   ]
 
+  sync: (vendor) ->
+    resellerStore = getStore vendor
+    resellerVariant = await ProductVariant.getFromSKU resellerStore, @sku
+    resellerVariant.setInventory await @getInventory()
+    
   setInventory: (value) ->
     { inventory_levels } = await Shopify.get @store,
       "/inventory_levels.json?inventory_item_ids=#{@_.inventory_item_id}"
@@ -30,6 +60,14 @@ class ProductVariant
       location_id: inventory_levels[0].location_id
       inventory_item_id: @_.inventory_item_id
       available: value
+
+  getInventory: ->
+    { inventory_levels } = await Shopify.get @store, 
+      "/inventory_levels.json?inventory_item_ids=#{@_.inventory_item_id}"
+    total = 0
+    for { available } in inventory_levels
+      total += available
+    total
 
   get: ->
     @_ = Obj.get "variant",
@@ -118,6 +156,7 @@ class Product
   Meta.mixin @::, [
     Meta.getters
       id: -> @_.id
+      title: -> @_.title
       images: ->
         for image in @_.images
           ProductImage.from @store, image
@@ -153,21 +192,15 @@ class Product
     Shopify.post @store, "/products/#{@_.id}/metafields.json", 
       metafield: meta name, value
 
-  sync: ->
-    @source ?= await @mget "source"
-    if @source.initialized != true
-      await @clone()
-      @source.initialized = true
-      await @mset "source", @source
-    @syncInventory()
-
-  syncInventory: ->
-
   clone: ->
-    @source ?= await @mget "source"
-    @supplier ?= await getStore @source.vendor
-    @original ?= await Product.get @supplier, @source.id
-    original = @original._
+    if @title.startsWith "/import"
+      @_clone()
+  
+  _clone: ->
+    [, vendor, id ] = Text.split /\s+/, @title
+    await @mset "source", { vendor, id }
+    supplier = await getStore vendor
+    original = (await Product.get supplier, id)._
     @_ =
       id: @id
       title: original.title
@@ -192,9 +225,9 @@ class Product
         for variant in original.variants
           variant.metafields ?= []
           variant.metafields.push meta "source",
-            vendor: @supplier.name
+            vendor: supplier.name
             id: variant.id
-          variant.inventory_management ="shopify"
+          # variant.inventory_management = "shopify"
           except [
             "id"
             "title"
