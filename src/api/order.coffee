@@ -22,11 +22,27 @@ class Order
               for { variant, quantity } in items
                 { variant_id: variant._.id, price: variant._.price, quantity }
 
+  @list: (store) ->
+    { orders } = await Shopify.get store, "/orders.json?limit=250"
+    for order in orders
+      Object.assign new Order,
+        store: store
+        _: order
+
+  @get: (store, id) ->
+    self = Object.assign new Order, { store, _: { id } }
+    self.get()
+
   Meta.mixin @::, [
     Meta.getters
       id: -> @_.id
       lineItems: -> @_.line_items
   ]
+
+  get: ->
+    @_ = Obj.get "order",
+      await Shopify.get @store, "/orders/#{@id}.json"
+    @
 
   mget: (name) ->
     { metafields } = await Shopify.get @store,
@@ -63,8 +79,8 @@ class Order
     await @close()
     orders
 
-  close: -> Shopify.post @store, "/orders/450789469/close.json"
-  
+  close: -> Shopify.post @store, "/orders/#{@id}/close.json"
+
   fulfill: ->
     source = await @mget "source"
     store = await getStore source.vendor
@@ -77,6 +93,11 @@ class Order
         # resellerItem.tracking = supplierItem.tracking
         undefined
     resellerOrder.put() 
+
+  delete: ->
+    await Shopify.del @store, "/orders/#{@id}.json"
+    @deleted = true
+    @
 
 
         

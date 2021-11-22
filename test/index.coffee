@@ -57,17 +57,32 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert products.length?
       assert products.length > 0
 
-    await test "Sync product", await target "sync", ->
-      await product.sync()
+    await test "Clone product", await target "clone", ->
+      $.addStore "Production-Store",
+        key: "3a1a300b7eac52e95e22e761f01b397b"
+        subdomain: "playtymeabdl"
+        token: "playtyme-tyme"
+      product = await $.Product.create reseller,
+        title: "/import Production-Store 6621768646730"
+        tags: [ "Test" ]
+      await product.clone()
 
-    await test "Get inventory levels", await target "sync", ->
-      assert.equal 0, await product.variants[0].inventory
+    await test "Get Variant From SKU", target "clone", ->
+      sku = product.variants[0].sku
+      _variant = await $.ProductVariant.getFromSKU reseller, sku
+      assert.equal product.variants[0].id, _variant.id
 
-    await test "Set inventory level", await target "sync", ->
+    await test "Get inventory levels", await target "inventory", ->
+      assert.equal 0, await product.variants[0].getInventory()
+
+    await test "Set inventory level", await target "inventory", ->
+      # ensure we're tracking inventory, in case we didn't run clone test
+      product.variants[0]._.inventory_management = "shopify"
+      await product.variants[0].put()
       await product.variants[0].setInventory 5
-      assert.equal 5, await product.variants[0].inventory
+      assert.equal 5, await product.variants[0].getInventory()
 
-    await test "Create Order", await target "sync", ->
+    await test "Create Order", await target "order", ->
       order = await $.Order.create reseller,
         items: [
           variant: product.variants[0]
@@ -77,8 +92,13 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert order._.id?
       assert order._.line_items?
 
-    await test "Forward Order", await target "sync", ->
+    await test "Forward Order", await target "order", ->
       console.log await order.forward()
+
+    await test "Inventory Update", await target "inventory", ->
+      variant = $.ProductVariant.getFromInventoryItem reseller, 
+        product.variants[0]._.inventory_item_id
+      assert.equal variant.id, product.variants[0].id
 
     await test "Delete product", target "product", ->
 
