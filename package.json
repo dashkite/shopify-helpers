@@ -26,14 +26,14 @@
   "devDependencies": {
     "@dashkite/amen": "^0.1.2",
     "@dashkite/amen-console": "^0.0.1",
-    "@dashkite/assert": "^0.1.3",
+    "@dashkite/assert": "^0.1.4",
     "@dashkite/genie": "^0.5.6",
-    "@dashkite/genie-presets": "file:../genie-presets",
-    "@dashkite/sky-presets": "file:../sky-presets"
+    "@dashkite/genie-presets": "^0.5.4",
+    "@dashkite/sky-presets": "^0.0.2"
   },
   "dependencies": {
-    "@dashkite/dolores": "file:../dolores",
-    "@dashkite/joy": "^0.3.15",
-    "node-fetch": "^2.6.5"
+    "@dashkite/dolores": "^0.0.1",
+    "@dashkite/joy": "^0.3.16",
+    "node-fetch": "^3.1.0"
   }
 }
