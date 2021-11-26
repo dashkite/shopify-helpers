@@ -23,7 +23,7 @@ class Order
                 { variant_id: variant._.id, price: variant._.price, quantity }
 
   @list: (store) ->
-    { orders } = await Shopify.get store, "/orders.json?limit=250"
+    { orders } = await Shopify.get store, "/orders.json?status=any&limit=250"
     for order in orders
       Object.assign new Order,
         store: store
