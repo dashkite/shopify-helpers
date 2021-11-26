@@ -91,18 +91,29 @@ class ProductVariant
       ], @_
     @
 
-  mget: (name) ->
+  _mget: (name) ->
     { metafields } = await Shopify.get @store,
-      "/products/#{@_.product_id}/variants/#{@_.id}/metafields.json"
+        "/products/#{@_.product_id}/variants/#{@_.id}/metafields.json"
     for field in metafields
       if "dashkite" == field.namespace && name == field.key
-        return JSON.parse field.value
+        return field
     # if not found...
     undefined
+
+  mget: (name) ->
+    metafield = await @_mget name
+    if metafield?
+      JSON.parse metafield.value
 
   mset: (name, value) ->
     Shopify.post @store, "/products/#{@_.product_id}/variants/#{@_.id}/metafields.json",
       metafield: meta name, value
+
+  mdelete: (name) ->
+    metafield = await @_mget name
+    if metafield?
+      await Shopify.del @store, "/metafields/#{metafield.id}.json",
+    undefined
 
 class ProductImage
 
@@ -179,18 +190,30 @@ class Product
     @deleted = true
     @
 
-  mget: (name) ->
-    { metafields } = await Shopify.get @store, "/products/#{@_.id}/metafields.json"
+  _mget: (name) ->
+    { metafields } = await Shopify.get @store,
+        "/products/#{@_.id}/metafields.json"
     for field in metafields
       if "dashkite" == field.namespace && name == field.key
-        return JSON.parse field.value
+        return field
     # if not found...
     undefined
+
+  mget: (name) ->
+    metafield = await @_mget name
+    if metafield?
+      JSON.parse metafield.value
 
   mset: (name, value) ->
     # TODO do we need to detect that this is an update?
     Shopify.post @store, "/products/#{@_.id}/metafields.json", 
       metafield: meta name, value
+
+  mdelete: (name) ->
+    metafield = await @_mget name
+    if metafield?
+      await Shopify.del @store, "/metafields/#{metafield.id}.json",
+    undefined
 
   clone: ->
     if @title.startsWith "/import"
@@ -236,7 +259,7 @@ class Product
             "updated_at"
             "admin_graphql_api_id"
             "image_id"
-            "inventory_quantity"
+            # "inventory_quantity"
             "inventory_quantity_adjustment"
             "inventory_item_id"
             "inventory_management"

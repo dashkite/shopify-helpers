@@ -58,12 +58,8 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert products.length > 0
 
     await test "Clone product", await target "clone", ->
-      $.addStore "Production-Store",
-        key: "3a1a300b7eac52e95e22e761f01b397b"
-        subdomain: "playtymeabdl"
-        token: "playtyme-tyme"
       product = await $.Product.create reseller,
-        title: "/import Production-Store 6621768646730"
+        title: "/import Test-Supplier 7465463709914"
         tags: [ "Test" ]
       await product.clone()
 
@@ -93,7 +89,7 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert order._.line_items?
 
     await test "Forward Order", await target "order", ->
-      console.log await order.forward()
+      # console.log await order.forward()
 
     await test "Inventory Update", await target "inventory", ->
       variant = $.ProductVariant.getFromInventoryItem reseller, 
