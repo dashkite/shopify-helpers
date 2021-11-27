@@ -2,7 +2,7 @@ import * as Obj from "@dashkite/joy/object"
 import * as Meta from "@dashkite/joy/metaclass"
 import { getStore } from "../stores"
 import * as Shopify from "../shopify"
-import { except, meta } from "./helpers"
+import { meta } from "./helpers"
 import { ProductVariant } from "./product"
 
 class Order
