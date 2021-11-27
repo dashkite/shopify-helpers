@@ -14,17 +14,21 @@ test = (name, value) ->
   else
     _test
       description: name
-      wait: 15000
+      wait: 20000
       value
 
 import stores from "./stores"
 
-do ({ reseller, supplier, products, product, order, webhook } = {}) ->
+do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
+
+  
 
   $.addStores stores
 
-  reseller = $.getStore "Test-Reseller"
-  supplier = $.getStore "Test-Supplier"
+  supplier = $.getStore "playtyme-test-supplier"
+  reseller = $.getStore "playtyme-test-reseller"
+  seedProduct = await $.Product.get supplier, "7465463709914"
+  seedProduct.url = "https://playtyme-test-supplier.myshopify.com/admin/products/7465463709914"
 
   print await test "Shopify Helpers", [
 
@@ -39,18 +43,23 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert product._.id?
 
     await test "Add metafield", target "product", ->
-      product.mset "source",
-        vendor: "Test-Supplier"
-        id: "7448670601434"
+      await product.mset "source",
+        vendor: "playtyme-test-supplier"
+        id: seedProduct.id
+
+      await product.mset "source2",
+        vendor: "playtyme-test-supplier"
+        id: seedProduct.id
 
     await test "Get metafield", target "product", ->
       value = await product.mget "source"
-      assert.equal "Test-Supplier", value.vendor
-      assert.equal "7448670601434", value.id
+      assert.equal "playtyme-test-supplier", value.vendor
+      assert.equal seedProduct.id, value.id
 
-    await test "Get metafield that is undefined", target "product", ->
-      value = await product.mget "foobar"
-      assert !value?
+    await test "Delete metafield / Get undefined", target "product", ->
+      assert ( await product.mget "source2" )?
+      await product.mdelete "source2"
+      assert !( await product.mget "source2" )?
 
     await test "List products", target "product", ->
       products = await $.Product.list reseller
@@ -58,25 +67,33 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert products.length > 0
 
     await test "Clone product", await target "clone", ->
+      supplier.product = await $.Product.create supplier,
+        title: "/import #{seedProduct.url}"
+        tags: [ "Test" ]
+      await supplier.product.clone()
+      await supplier.product.mdelete "source"
+      await variant.mdelete "source" for variant in supplier.product.variants
+
       product = await $.Product.create reseller,
-        title: "/import Test-Supplier 7465463709914"
+        title: "/import https://playtyme-test-supplier.myshopify.com/admin/products/#{supplier.product.id}"
         tags: [ "Test" ]
       await product.clone()
 
-    await test "Get Variant From SKU", target "clone", ->
-      sku = product.variants[0].sku
-      _variant = await $.ProductVariant.getFromSKU reseller, sku
-      assert.equal product.variants[0].id, _variant.id
+    # TODO: Test forward pointer.
+    # await test "Get Variant From SKU", target "clone", ->
+    #   sku = product.variants[0].sku
+    #   _variant = await $.ProductVariant.getFromSKU reseller, sku
+    #   assert.equal product.variants[0].id, _variant.id
 
     await test "Get inventory levels", await target "inventory", ->
-      assert.equal 0, await product.variants[0].getInventory()
+      assert.equal 5, await product.variants[0].getInventory()
 
     await test "Set inventory level", await target "inventory", ->
       # ensure we're tracking inventory, in case we didn't run clone test
       product.variants[0]._.inventory_management = "shopify"
       await product.variants[0].put()
-      await product.variants[0].setInventory 5
-      assert.equal 5, await product.variants[0].getInventory()
+      await product.variants[0].setInventory 10
+      assert.equal 10, await product.variants[0].getInventory()
 
     await test "Create Order", await target "order", ->
       order = await $.Order.create reseller,
@@ -89,17 +106,20 @@ do ({ reseller, supplier, products, product, order, webhook } = {}) ->
       assert order._.line_items?
 
     await test "Forward Order", await target "order", ->
-      # console.log await order.forward()
+      orders = await order.forward()
+      assert.equal 1, orders.length
 
     await test "Inventory Update", await target "inventory", ->
-      variant = $.ProductVariant.getFromInventoryItem reseller, 
+      variant = await $.ProductVariant.getFromInventoryItem reseller, 
         product.variants[0]._.inventory_item_id
       assert.equal variant.id, product.variants[0].id
 
     await test "Delete product", target "product", ->
 
-      for product in products
-        await product.delete()
+      await supplier.product.delete() if supplier.product?
+
+      for product in ( await $.Product.list reseller )
+        await product.delete() 
 
       products = await $.Product.list reseller
       assert products.length?

@@ -37,11 +37,16 @@ class Order
     Meta.getters
       id: -> @_.id
       lineItems: -> @_.line_items
+      fulfillments: -> @_.fulfillments
   ]
 
   get: ->
     @_ = Obj.get "order",
       await Shopify.get @store, "/orders/#{@id}.json"
+    @
+
+  put: ->
+    @_ = Obj.get "order", await Shopify.put @store, "/orders/#{@_.id}.json", { order: @_ }
     @
 
   mget: (name) ->
@@ -76,23 +81,40 @@ class Order
           vendor: @store.name
           id: @id
         order
-    await @close()
+
     orders
 
   close: -> Shopify.post @store, "/orders/#{@id}/close.json"
 
+  getFulfillmentFromTrackingNumber: (trackingNumber) ->
+    for fulfillment in @fulfillments when fulfillment.tracking_number == trackingNumber
+      return fulfillment
+    # When we fail to match...
+    undefined
+
   fulfill: ->
     source = await @mget "source"
-    store = await getStore source.vendor
-    resellerOrder = await Order.get store, source.id
-    for resellerItem in resellerOrder.lineItems
-      resellerVariant = await ProductVariant.get store, resellerItem.variant_id
-      source = await resellerVariant.mget "source"
-      for supplierItem in @lineItems when item.variant_id == source.id
-        # TODO how do we update?
-        # resellerItem.tracking = supplierItem.tracking
-        undefined
-    resellerOrder.put() 
+    if !source?
+      # This supplier order is not one associated with DashKite.
+      return
+
+    { vendor, id } = source
+    resellerStore = getStore vendor
+    resellerOrder = await Order.get resellerStore, id
+    for fulfillment in @fulfillments
+      _fulfillment = resellerOrder.getFulfillmentFromTrackingNumber fulfillment.tracking_number 
+      if !_fulfillment?
+        resellerOrder.fulfillments.push 
+          status: fulfillment.status
+          tracking_company: fulfillment.tracking_company
+          tracking_number: fulfillment.tracking_number
+          order_id: resellerOrder.id
+      else
+        _fulfillment.status = fulfillment.status
+        _fulfillment.tracking_company = fulfillment.tracking_company
+        _fulfillment.tracking_number = fulfillment.tracking_number
+
+      await resellerOrder.put()
 
   delete: ->
     await Shopify.del @store, "/orders/#{@id}.json"

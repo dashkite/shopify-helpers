@@ -1,9 +1,12 @@
 import * as Obj from "@dashkite/joy/object"
 import * as Meta from "@dashkite/joy/metaclass"
 import * as Text from "@dashkite/joy/text"
+import assert from "@dashkite/assert"
 import { getStore } from "../stores"
 import * as Shopify from "../shopify"
 import { except, meta } from "./helpers"
+
+
 
 class ProductVariant
 
@@ -27,15 +30,8 @@ class ProductVariant
   # TODO replace this nonsense with forward pointers
 
   @getFromInventoryItem: (store, id) ->
-    variants = Obj.get "variants",
-      await Shopify.get store, "/variants.json"
+    { variants } = await Shopify.get store, "/variants.json"
     for variant in variants when variant.inventory_item_id == id
-      return ProductVariant.from store, variant
-
-  @getFromSKU: (store, sku) ->
-    variants = Obj.get "variants",
-      await Shopify.get store, "/variants.json"
-    for variant in variants when variant.sku == sku
       return ProductVariant.from store, variant
 
   Meta.mixin @::, [
@@ -48,9 +44,10 @@ class ProductVariant
         @_.inventory_quantity
   ]
 
-  sync: (vendor) ->
+  sync: ->
+    { vendor, id } = await @mget "reseller"
     resellerStore = getStore vendor
-    resellerVariant = await ProductVariant.getFromSKU resellerStore, @sku
+    resellerVariant = await ProductVariant.get resellerStore, id
     resellerVariant.setInventory await @getInventory()
     
   setInventory: (value) ->
@@ -95,7 +92,7 @@ class ProductVariant
     { metafields } = await Shopify.get @store,
         "/products/#{@_.product_id}/variants/#{@_.id}/metafields.json"
     for field in metafields
-      if "dashkite" == field.namespace && name == field.key
+      if ( "dashkite" == field.namespace ) && ( name == field.key )
         return field
     # if not found...
     undefined
@@ -103,7 +100,8 @@ class ProductVariant
   mget: (name) ->
     metafield = await @_mget name
     if metafield?
-      JSON.parse metafield.value
+      return JSON.parse metafield.value
+    undefined
 
   mset: (name, value) ->
     Shopify.post @store, "/products/#{@_.product_id}/variants/#{@_.id}/metafields.json",
@@ -190,6 +188,11 @@ class Product
     @deleted = true
     @
 
+  getVariantFromSKU: (sku) ->
+    for variant in @variants when variant.sku == sku
+      return variant
+    undefined
+
   _mget: (name) ->
     { metafields } = await Shopify.get @store,
         "/products/#{@_.id}/metafields.json"
@@ -218,9 +221,15 @@ class Product
   clone: ->
     if @title.startsWith "/import"
       @_clone()
-  
+
+  parseCloneTitle: ->
+    url = new URL @title.split(/\s+/)[1].trim()
+    vendor = url.hostname.split(".")[0]
+    [ ..., id ]= url.pathname.split "/"
+    { vendor, id }
+
   _clone: ->
-    [, vendor, id ] = Text.split /\s+/, @title
+    { vendor, id } = @parseCloneTitle()
     await @mset "source", { vendor, id }
     supplier = await getStore vendor
     original = (await Product.get supplier, id)._
@@ -268,6 +277,14 @@ class Product
           ], variant
 
     await @put()
+
+    for variant in original.variants
+      supplierVariant = await ProductVariant.get supplier, variant.id
+      await supplierVariant.mset "reseller",
+        vendor: @store.name
+        id: @getVariantFromSKU(supplierVariant.sku).id
+
+    @
 
     # build up a mapping of image ids
     imageMap = {}
