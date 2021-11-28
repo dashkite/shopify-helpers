@@ -156,11 +156,13 @@ class Product
       ]
 
 
-  clone: ->
+  clone: (context = {}) ->
     if @title.startsWith "/import"
-      await @_clone()
+      await @_clone context
 
-  _clone: ->
+  _clone: (context) ->
+    setForwardPointers = context.setForwardPointers ? true
+
     { vendor, id } = parseCloneTitle @title
     await @mset "source", { vendor, id }
     supplier = getStore vendor
@@ -187,9 +189,10 @@ class Product
       resellerVariant = @getVariantFromSKU supplierVariant.sku
 
       # Set forward pointer from supplier variant to the reseller it created.
-      await supplierVariant.mset "reseller",
-        vendor: @store.name
-        id: resellerVariant.id
+      if setForwardPointers
+        await supplierVariant.mset "reseller",
+          vendor: @store.name
+          id: resellerVariant.id
       
       # Set image ID for each reseller variant with the new, equivalent image.
       if supplierVariant.imageID?

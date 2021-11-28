@@ -25,35 +25,32 @@ do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
 
   $.addStores stores
 
-  supplier = $.getStore "playtyme-test-supplier"
-  reseller = $.getStore "playtyme-test-reseller"
-  seedProduct = await $.Product.get supplier, "7465463709914"
-  seedProduct.url = "https://playtyme-test-supplier.myshopify.com/admin/products/7465463709914"
+  supplier = $.getStore "playtyme-david-supplier"
+  reseller = $.getStore "playtyme-david-reseller"
+  seedProduct = await $.Product.get supplier, "7166283186376"
+  seedProduct.url = "https://#{supplier.subdomain}.myshopify.com/admin/products/#{seedProduct.id}"
 
   print await test "Shopify Helpers", [
 
     await test "Create Product", target "product", ->
       product = await $.Product.create reseller,
         title: "Test Product"
-        html: "This is a test product."
-        vendor: "Acme, Inc."
-        type: "Test"
         tags: [ "Test" ]
 
       assert product._.id?
 
     await test "Add metafield", target "product", ->
       await product.mset "source",
-        vendor: "playtyme-test-supplier"
+        vendor: supplier.name
         id: seedProduct.id
 
       await product.mset "source2",
-        vendor: "playtyme-test-supplier"
+        vendor: supplier.name
         id: seedProduct.id
 
     await test "Get metafield", target "product", ->
       value = await product.mget "source"
-      assert.equal "playtyme-test-supplier", value.vendor
+      assert.equal supplier.name, value.vendor
       assert.equal seedProduct.id, value.id
 
     await test "Delete metafield / Get undefined", target "product", ->
@@ -75,7 +72,7 @@ do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
       await variant.mdelete "source" for variant in supplier.product.variants
 
       product = await $.Product.create reseller,
-        title: "/import https://playtyme-test-supplier.myshopify.com/admin/products/#{supplier.product.id}"
+        title: "/import https://#{supplier.subdomain}.myshopify.com/admin/products/#{supplier.product.id}"
         tags: [ "Test" ]
       await product.clone()
 

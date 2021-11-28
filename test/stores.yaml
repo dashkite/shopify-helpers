@@ -8,3 +8,14 @@ playtyme-test-supplier:
   subdomain: playtyme-test-supplier
   token: playtyme-test-supplier-token
   shared: playtyme-test-supplier-shared
+playtyme-david-reseller:
+  key: a11087c50bb924743b072bd97fe58dea
+  subdomain: playtyme-david-reseller
+  token: playtyme-david-reseller-token
+  shared: playtyme-david-reseller-shared
+playtyme-david-supplier:
+  key: dd0852dba08acb917addb246bbf04200
+  subdomain: playtyme-david-supplier
+  token: playtyme-david-supplier-token
+  shared: playtyme-david-supplier-shared
+
