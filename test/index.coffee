@@ -97,6 +97,15 @@ do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
 
     await test "Create Order", await target "order", ->
       order = await $.Order.create reseller,
+        shippingAddress:
+          address1: "123 Main St"
+          city: "Los Angeles"
+          country: "United States"
+          first_name: "John"
+          last_name: "Doe"
+          name: "John Doe"
+          province: "California"
+          zip: "90012"
         items: [
           variant: product.variants[0]
           quantity: 1
