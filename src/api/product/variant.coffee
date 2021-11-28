@@ -33,33 +33,38 @@ class ProductVariant
     Meta.getters
       id: -> @_.id
       sku: -> @_.sku
-      image_id: -> @_.image_id
+      imageID: -> @_.image_id
+      inventoryItemID: -> @_.inventory_item_id
       inventory: ->
         # make sure we have the latest
         await @get()
         @_.inventory_quantity
 
     Meta.setters
-      image_id: (value) -> @_.image_id = value
+      imageID: (value) -> @_.image_id = value
   ]
 
   sync: ->
-    { vendor, id } = await @mget "reseller"
-    resellerStore = getStore vendor
-    resellerVariant = await ProductVariant.get resellerStore, id
-    resellerVariant.setInventory await @getInventory()
+    reseller = await @mget "reseller"
+
+    # Only update the reseller inventory if they've cloned this item.
+    if reseller?
+      { vendor, id } = reseller
+      resellerStore = getStore vendor
+      resellerVariant = await ProductVariant.get resellerStore, id
+      resellerVariant.setInventory await @getInventory()
     
   setInventory: (value) ->
     { inventory_levels } = await Shopify.get @store,
-      "/inventory_levels.json?inventory_item_ids=#{@_.inventory_item_id}"
+      "/inventory_levels.json?inventory_item_ids=#{@inventoryItemID}"
     Shopify.post @store, "/inventory_levels/set.json",
       location_id: inventory_levels[0].location_id
-      inventory_item_id: @_.inventory_item_id
+      inventory_item_id: @inventoryItemID
       available: value
 
   getInventory: ->
     { inventory_levels } = await Shopify.get @store, 
-      "/inventory_levels.json?inventory_item_ids=#{@_.inventory_item_id}"
+      "/inventory_levels.json?inventory_item_ids=#{@inventoryItemID}"
     total = 0
     for { available } in inventory_levels
       total += available

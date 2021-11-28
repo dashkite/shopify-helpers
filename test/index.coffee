@@ -79,12 +79,6 @@ do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
         tags: [ "Test" ]
       await product.clone()
 
-    # TODO: Test forward pointer.
-    # await test "Get Variant From SKU", target "clone", ->
-    #   sku = product.variants[0].sku
-    #   _variant = await $.ProductVariant.getFromSKU reseller, sku
-    #   assert.equal product.variants[0].id, _variant.id
-
     await test "Get inventory levels", await target "inventory", ->
       assert.equal 5, await product.variants[0].getInventory()
 

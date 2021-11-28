@@ -192,8 +192,8 @@ class Product
         id: resellerVariant.id
       
       # Set image ID for each reseller variant with the new, equivalent image.
-      if supplierVariant.image_id?
-        resellerVariant.image_id = imageMap[ supplierVariant.image_id ]
+      if supplierVariant.imageID?
+        resellerVariant.imageID = imageMap[ supplierVariant.imageID ]
         await resellerVariant.put()
 
     # Return the most up-to-date data of the clone.
