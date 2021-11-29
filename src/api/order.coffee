@@ -4,6 +4,7 @@ import { getStore } from "../stores"
 import * as Shopify from "../shopify"
 import { meta } from "./helpers"
 import { ProductVariant } from "./product"
+import { Fulfillment } from "./fulfillment"
 
 # TODO: Further work should involve creating formal classes for parts of an order
 #       like shipping address and line item.
@@ -66,6 +67,8 @@ class Order
       note: -> @_.note
       noteAttributes: -> @_.note_attributes 
       shippingAddress: -> @_.shipping_address
+      locationID: -> @_.location_id
+      fulfillmentStatus: -> @_.fulfillment_status
   ]
 
   get: ->
@@ -77,9 +80,14 @@ class Order
     @_ = Obj.get "order", await Shopify.put @store, "/orders/#{@_.id}.json", { order: @_ }
     @
 
+  delete: ->
+    await Shopify.del @store, "/orders/#{@id}.json"
+    @deleted = true
+    @
+
   mget: (name) ->
     { metafields } = await Shopify.get @store,
-      "/orders/#{@_.id}/metafields.json"
+      "/orders/#{@id}/metafields.json"
     for field in metafields
       if "dashkite" == field.namespace && name == field.key
         return JSON.parse field.value
@@ -87,7 +95,7 @@ class Order
     undefined
 
   mset: (name, value) ->
-    Shopify.post @store, "/orders/#{@_.id}/metafields.json",
+    Shopify.post @store, "/orders/#{@id}/metafields.json",
       metafield: meta name, value
 
   # Forward line items from the paid reseller order to relevant supplier(s).
@@ -142,7 +150,9 @@ class Order
     # When we fail to match...
     undefined
 
-  fulfill: ->
+  listFulfillments: -> Fulfillment.list @
+
+  createFulfillment: (supplierFulfillment) ->
     source = await @mget "source"
     if !source?
       # This supplier order is not one associated with DashKite.
@@ -151,27 +161,41 @@ class Order
     { vendor, id } = source
     resellerStore = getStore vendor
     resellerOrder = await Order.get resellerStore, id
-    for fulfillment in @fulfillments
-      _fulfillment = resellerOrder.getFulfillmentFromTrackingNumber fulfillment.tracking_number 
-      if !_fulfillment?
-        resellerOrder.fulfillments.push 
-          status: fulfillment.status
-          tracking_company: fulfillment.tracking_company
-          tracking_number: fulfillment.tracking_number
-          order_id: resellerOrder.id
-      else
-        _fulfillment.status = fulfillment.status
-        _fulfillment.tracking_company = fulfillment.tracking_company
-        _fulfillment.tracking_number = fulfillment.tracking_number
 
-      await resellerOrder.put()
+    resellerFulfillment = await Fulfillment.create resellerOrder, supplierFulfillment
+    await resellerOrder.mset "fulfillment:#{supplierFulfillment.id}",
+      id: resellerFulfillment.id
+      order_id: resellerOrder.id
 
-  delete: ->
-    await Shopify.del @store, "/orders/#{@id}.json"
-    @deleted = true
-    @
+    resellerFulfillment
 
+  updateFulfillment: (supplierFulfillment) ->
+    source = await @mget "source"
+    if !source?
+      # This supplier order is not one associated with DashKite.
+      return
 
+    { vendor, id } = source
+    resellerStore = getStore vendor
+    resellerOrder = await Order.get resellerStore, id
+
+    metadata = await resellerOrder.mget "fulfillment:#{supplierFulfillment.id}"
+    
+    if metadata?
+      resellerFulfillment = await Fulfillment.get resellerStore, metadata
+      Object.assign resellerFulfillment, Obj.mask [
+          "trackingNumber"
+          "trackingCompany"
+          "trackingURLs"
+        ], supplierFulfillment
+  
+      await resellerFulfillment.put()
+
+      if supplierFulfillment.status == "fulfilled"
+        await resellerFulfillment.complete()
+      
+      resellerFulfillment
+    
         
 export {
   Order

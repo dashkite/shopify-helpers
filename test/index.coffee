@@ -19,7 +19,7 @@ test = (name, value) ->
 
 import stores from "./stores"
 
-do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
+do ({ source, reseller, supplier, products, product, order, orders, webhook } = {}) ->
 
   
 
@@ -108,6 +108,31 @@ do ({ source, reseller, supplier, products, product, order, webhook } = {}) ->
     await test "Forward Order", await target "order", ->
       orders = await order.forward()
       assert.equal 1, orders.length
+
+    await test "Trigger Fulfillment", await target "order", ->
+      # Basic Fulfillment class method
+      supplierFulfillment = await $.Fulfillment.create orders[0],
+        $.Fulfillment.from supplier,
+          type: "manual"
+          status: "fulfilled"
+          tracking_number: "123456789"
+          tracking_urls: [ "https://shipping.xyz/track/123456789" ]
+
+      fulfillments = await orders[0].listFulfillments()
+      assert.equal 1, fulfillments.length
+      assert.equal supplierFulfillment.id, fulfillments[0].id
+
+      # High-level order instance methods we'll use in webhook.
+      resellerFulfillment = await orders[0].createFulfillment supplierFulfillment
+      fulfillments = await order.listFulfillments()
+      assert.equal 1, fulfillments.length
+      assert.equal resellerFulfillment.id, fulfillments[0].id
+
+      supplierFulfillment.status = "fulfilled"
+      resellerFulfillment = await orders[0].updateFulfillment supplierFulfillment
+
+      order = await order.get()
+      assert.equal "fulfilled", order.fulfillmentStatus
 
     await test "Inventory Update", await target "inventory", ->
       variant = await $.ProductVariant.getFromInventoryItem reseller, 
