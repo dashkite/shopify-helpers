@@ -152,7 +152,7 @@ class Order
 
   listFulfillments: -> Fulfillment.list @
 
-  createFulfillment: (supplierFulfillment) ->
+  createForwardFulfillment: (supplierFulfillment) ->
     source = await @mget "source"
     if !source?
       # This supplier order is not one associated with DashKite.
@@ -169,7 +169,7 @@ class Order
 
     resellerFulfillment
 
-  updateFulfillment: (supplierFulfillment) ->
+  updateForwardFulfillment: (supplierFulfillment) ->
     source = await @mget "source"
     if !source?
       # This supplier order is not one associated with DashKite.
@@ -191,7 +191,7 @@ class Order
   
       await resellerFulfillment.put()
 
-      if supplierFulfillment.status == "fulfilled"
+      if supplierFulfillment.status == "fulfilled" && resellerFulfillment.status != "fulfilled"
         await resellerFulfillment.complete()
       
       resellerFulfillment

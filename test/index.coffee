@@ -113,8 +113,9 @@ do ({ source, reseller, supplier, products, product, order, orders, webhook } = 
       # Basic Fulfillment class method
       supplierFulfillment = await $.Fulfillment.create orders[0],
         $.Fulfillment.from supplier,
-          type: "manual"
-          status: "fulfilled"
+          service: "manual"
+          status: "pending"
+          tracking_company: "XYZ"
           tracking_number: "123456789"
           tracking_urls: [ "https://shipping.xyz/track/123456789" ]
 
@@ -123,16 +124,23 @@ do ({ source, reseller, supplier, products, product, order, orders, webhook } = 
       assert.equal supplierFulfillment.id, fulfillments[0].id
 
       # High-level order instance methods we'll use in webhook.
-      resellerFulfillment = await orders[0].createFulfillment supplierFulfillment
+      resellerFulfillment = await orders[0].createForwardFulfillment supplierFulfillment
       fulfillments = await order.listFulfillments()
       assert.equal 1, fulfillments.length
       assert.equal resellerFulfillment.id, fulfillments[0].id
+      assert.equal resellerFulfillment.stat
+      
+      order = await order.get()
+      assert.equal order.fulfillments[0].status, "success"
+      assert.equal order.fulfillmentStatus, "fulfilled"
 
-      supplierFulfillment.status = "fulfilled"
-      resellerFulfillment = await orders[0].updateFulfillment supplierFulfillment
+      # Apply the update hook, even though this is already complete.
+      supplierFulfillment.status = "success"
+      resellerFulfillment = await orders[0].updateForwardFulfillment supplierFulfillment
 
       order = await order.get()
-      assert.equal "fulfilled", order.fulfillmentStatus
+      assert.equal order.fulfillments[0].status, "success"
+      assert.equal order.fulfillmentStatus, "fulfilled"
 
     await test "Inventory Update", await target "inventory", ->
       variant = await $.ProductVariant.getFromInventoryItem reseller, 

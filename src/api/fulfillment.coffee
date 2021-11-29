@@ -12,9 +12,10 @@ class Fulfillment
 
   @create: (order, fulfillment) ->
     body =
-      type: fulfillment?.status 
+      service: fulfillment?.service
       status: fulfillment?.status 
       location_id: order.locationID ? ( await Shop.getPrimaryLocationID order.store )
+      tracking_company: fulfillment?.trackingCompany
       tracking_number: fulfillment?.trackingNumber
       tracking_urls: fulfillment?.trackingURLs
       
@@ -46,7 +47,7 @@ class Fulfillment
   Meta.mixin @::, [
     Meta.getters
       id: -> @_.id
-      type: -> @_.type
+      service: -> @_.service
       orderID: -> @_.order_id
       trackingCompany: -> @_.tracking_company
       trackingNumber: -> @_.tracking_number
