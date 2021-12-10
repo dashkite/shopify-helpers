@@ -32,6 +32,10 @@ class ProductVariant
   Meta.mixin @::, [
     Meta.getters
       id: -> @_.id
+      title: -> @_.title
+      price: -> @_.price
+      url: -> "https://#{@store.subdomain}.myshopify.com/admin/products/#{@productID}/variants/#{@id}"
+      productID: -> @_.product_id
       sku: -> @_.sku
       imageID: -> @_.image_id
       inventoryItemID: -> @_.inventory_item_id
@@ -42,21 +46,27 @@ class ProductVariant
 
     Meta.setters
       imageID: (value) -> @_.image_id = value
+      inventory: (value) -> @_.inventory_quantity = value
   ]
 
   sync: ->
     reseller = await @mget "reseller"
 
     # Only update the reseller inventory if they've cloned this item.
-    if reseller?
-      { vendor, id } = reseller
-      resellerStore = getStore vendor
-      resellerVariant = await ProductVariant.get resellerStore, id
-      resellerVariant.setInventory await @getInventory()
+    if !reseller?
+      return undefined
     
-  setInventory: (value) ->
+    { vendor, id } = reseller
+    resellerStore = getStore vendor
+    resellerVariant = await ProductVariant.get resellerStore, id
+    inventory = await @getInventory()
+    await resellerVariant.setInventory inventory
+    { resellerVariant, newInventory: inventory }
+    
+  setInventory: (value) -> 
     { inventory_levels } = await Shopify.get @store,
       "/inventory_levels.json?inventory_item_ids=#{@inventoryItemID}"
+    
     Shopify.post @store, "/inventory_levels/set.json",
       location_id: inventory_levels[0].location_id
       inventory_item_id: @inventoryItemID
@@ -95,7 +105,7 @@ class ProductVariant
 
   _mget: (name) ->
     { metafields } = await Shopify.get @store,
-        "/products/#{@_.product_id}/variants/#{@_.id}/metafields.json"
+        "/products/#{@productID}/variants/#{@id}/metafields.json"
     for field in metafields
       if ( "dashkite" == field.namespace ) && ( name == field.key )
         return field

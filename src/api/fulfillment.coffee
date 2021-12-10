@@ -49,6 +49,7 @@ class Fulfillment
       id: -> @_.id
       service: -> @_.service
       orderID: -> @_.order_id
+      orderURL: -> "https://#{@store.subdomain}.myshopify.com/admin/orders/#{@orderID}"
       trackingCompany: -> @_.tracking_company
       trackingNumber: -> @_.tracking_number
       trackingURLs: -> @_.tracking_urls

@@ -85,7 +85,9 @@ class Product
   Meta.mixin @::, [
     Meta.getters
       id: -> @_.id
+      url: -> "https://#{@store.subdomain}.myshopify.com/admin/products/#{@id}"
       title: -> @_.title
+      html: -> @_.body_html
       images: ->
         for image in @_.images
           ProductImage.from @store, image

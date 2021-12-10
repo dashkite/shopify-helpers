@@ -30,8 +30,9 @@ class Order
             shipping_address: order.shippingAddress
             line_items: do ->
               for item in order.items
-                variant_id: item.variant._.id
-                price: item.variant._.price
+                variant_id: item.variant.id
+                variant_title: item.variant.title
+                price: item.variant.price
                 quantity: item.quantity
                 requires_shipping: item.requiresShipping
 
@@ -69,6 +70,8 @@ class Order
       shippingAddress: -> @_.shipping_address
       locationID: -> @_.location_id
       fulfillmentStatus: -> @_.fulfillment_status
+      subdomain: -> @store.subdomain
+      url: -> "https://#{@subdomain}.myshopify.com/admin/orders/#{@id}"
   ]
 
   get: ->
@@ -181,20 +184,22 @@ class Order
 
     metadata = await resellerOrder.mget "fulfillment:#{supplierFulfillment.id}"
     
-    if metadata?
-      resellerFulfillment = await Fulfillment.get resellerStore, metadata
-      Object.assign resellerFulfillment, Obj.mask [
-          "trackingNumber"
-          "trackingCompany"
-          "trackingURLs"
-        ], supplierFulfillment
-  
-      await resellerFulfillment.put()
+    if !metadata?
+      return undefined
 
-      if supplierFulfillment.status == "fulfilled" && resellerFulfillment.status != "fulfilled"
-        await resellerFulfillment.complete()
-      
-      resellerFulfillment
+    resellerFulfillment = await Fulfillment.get resellerStore, metadata
+    Object.assign resellerFulfillment, Obj.mask [
+        "trackingNumber"
+        "trackingCompany"
+        "trackingURLs"
+      ], supplierFulfillment
+
+    await resellerFulfillment.put()
+
+    if supplierFulfillment.status == "fulfilled" && resellerFulfillment.status != "fulfilled"
+      await resellerFulfillment.complete()
+    
+    resellerFulfillment
     
         
 export {
