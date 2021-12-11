@@ -14,7 +14,7 @@ test = (name, value) ->
   else
     _test
       description: name
-      wait: 20000
+      wait: 30000
       value
 
 import stores from "./stores"
@@ -28,7 +28,6 @@ do ({ source, reseller, supplier, products, product, order, orders, webhook } = 
   supplier = $.getStore "playtyme-david-supplier"
   reseller = $.getStore "playtyme-david-reseller"
   seedProduct = await $.Product.get supplier, "7166283186376"
-  seedProduct.url = "https://#{supplier.subdomain}.myshopify.com/admin/products/#{seedProduct.id}"
 
   print await test "Shopify Helpers", [
 
